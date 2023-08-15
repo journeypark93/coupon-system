@@ -52,6 +52,8 @@ class ApplyServiceTest {
 
         latch.await();
 
+        Thread.sleep(10000);
+
         long count = couponRepository.count();
 
         assertThat(count).isEqualTo(100);
@@ -65,6 +67,32 @@ class ApplyServiceTest {
         //                                  저장하는데 lock 2초... 그러면 사용자들이 2초를 기다려야 함.
         // 해결방안 4) redis incr 명령어 사용(쿠폰 개수에 대한 정확성만 관리하면 됨.):  key에 대한 value를 1씩 증가시킴.
         //                                    redis 는 single thread 기반으로 laze condition 해결, incr 성능도 빠름. 데이터 정합성도 지킬 수 있음.
+    }
+
+    @Test
+    public void 한명당_한개의_쿠폰만_발급() throws InterruptedException {
+        int threadCount = 1000;
+
+        ExecutorService executorService = Executors.newFixedThreadPool(32);
+        CountDownLatch latch = new CountDownLatch(threadCount);
+
+        for (int i=0; i< threadCount; i++){
+            executorService.submit(() -> {
+                try {
+                    applyService.apply(1L);
+                } finally {
+                    latch.countDown();
+                }
+            });
+        }
+
+        latch.await();
+
+        Thread.sleep(10000);
+
+        long count = couponRepository.count();
+
+        assertThat(count).isEqualTo(1);
     }
 
 }
